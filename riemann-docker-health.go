@@ -76,8 +76,8 @@ func main() {
 		}
 
 		for _, container := range containers {
-      alertCPU(container)
-      alertMemory(container)
+			alertCPU(container)
+			alertMemory(container)
 		}
 	}
 }
