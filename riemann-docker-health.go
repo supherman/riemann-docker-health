@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"github.com/amir/raidman"
 	"github.com/supherman/riemann-docker-health/docker"
@@ -11,7 +12,19 @@ import (
 	"time"
 )
 
-func hostname() string {
+var (
+	cpuWarning  = flag.Int("cpu_warning", 50, "CPU warning threshold")
+	cpuCritical = flag.Int("cpu_critical", 90, "CPU critical threshold")
+	memWarning  = flag.Int("memory_warning", 50, "Memory warning threshold")
+	memCritical = flag.Int("memory_critical", 90, "Memory critical threshold")
+)
+
+type Threshold struct {
+	warning  int
+	critical int
+}
+
+func Hostname() string {
 	hostname, err := os.Hostname()
 	if err != nil {
 		log.Println(err)
@@ -19,7 +32,7 @@ func hostname() string {
 	return hostname
 }
 
-func alert(event *raidman.Event) {
+func Alert(event *raidman.Event) {
 	c, err := raidman.Dial("tcp", "localhost:5555")
 	if err != nil {
 		panic(err)
@@ -32,41 +45,57 @@ func alert(event *raidman.Event) {
 	c.Close()
 }
 
-func alertCPU(container string) {
-	containerCpu, err := cpu.GetUsage(container)
-	if err != nil {
-		log.Println(err)
+func ComputeState(metric int, threshold *Threshold) string {
+	switch {
+	case metric >= threshold.critical:
+		return "critical"
+	case metric >= threshold.warning && metric < threshold.critical:
+		return "warning"
 	}
-
-	var cpuEvent = &raidman.Event{
-		State:   "ok",
-		Service: "cpu",
-		Metric:  int(containerCpu),
-		Ttl:     10,
-		Host:    fmt.Sprintf("%s %s", hostname(), container),
-	}
-	alert(cpuEvent)
+	return "ok"
 }
 
-func alertMemory(container string) {
-	containerMem, err := mem.GetUsage(container)
-	if err != nil {
-		log.Println(err)
+func AlertCPU(container string, threshold *Threshold) {
+	containerCpu, _ := cpu.GetUsage(container)
+
+	metric := int(containerCpu)
+	state := ComputeState(metric, threshold)
+
+	var cpuEvent = &raidman.Event{
+		State:   state,
+		Service: "cpu",
+		Metric:  metric,
+		Ttl:     10,
+		Host:    fmt.Sprintf("%s %s", Hostname(), container),
 	}
+	Alert(cpuEvent)
+}
+
+func AlertMemory(container string, threshold *Threshold) {
+	containerMem, _ := mem.GetPercentage(container)
+
+	metric := int(containerMem)
+	state := ComputeState(metric, threshold)
 
 	var memEvent = &raidman.Event{
-		State:   "ok",
+		State:   state,
 		Service: "memory",
-		Metric:  int(containerMem),
+		Metric:  metric,
 		Ttl:     10,
-		Host:    fmt.Sprintf("%s %s", hostname(), container),
+		Host:    fmt.Sprintf("%s %s", Hostname(), container),
 	}
-	alert(memEvent)
+	Alert(memEvent)
 }
 
 func main() {
+	flag.Parse()
+	cpuThreshold := Threshold{*cpuWarning, *cpuCritical}
+	memThreshold := Threshold{*memWarning, *memCritical}
+
 	go cpu.Monitor()
+
 	tick := time.NewTicker(1 * time.Second)
+
 	for {
 		<-tick.C
 		containers, err := docker.ListContainers()
@@ -76,8 +105,8 @@ func main() {
 		}
 
 		for _, container := range containers {
-			alertCPU(container)
-			alertMemory(container)
+			AlertCPU(container, &cpuThreshold)
+			AlertMemory(container, &memThreshold)
 		}
 	}
 }
