@@ -17,6 +17,8 @@ var (
 	cpuCritical = flag.Int("cpu_critical", 90, "CPU critical threshold")
 	memWarning  = flag.Int("memory_warning", 50, "Memory warning threshold")
 	memCritical = flag.Int("memory_critical", 90, "Memory critical threshold")
+	host        = flag.String("host", "127.0.0.1", "Riemann host (default: 127.0.0.1)")
+	port        = flag.String("port", "5555", "Riemann port (default: 5555")
 )
 
 type Threshold struct {
@@ -33,7 +35,7 @@ func Hostname() string {
 }
 
 func Alert(event *raidman.Event) {
-	c, err := raidman.Dial("tcp", "localhost:5555")
+	c, err := raidman.Dial("tcp", *host+":"+*port)
 	if err != nil {
 		panic(err)
 	}
@@ -88,6 +90,7 @@ func AlertMemory(container string, threshold *Threshold) {
 }
 
 func main() {
+	fmt.Println("Initializing monitoring agent...")
 	flag.Parse()
 	cpuThreshold := Threshold{*cpuWarning, *cpuCritical}
 	memThreshold := Threshold{*memWarning, *memCritical}
