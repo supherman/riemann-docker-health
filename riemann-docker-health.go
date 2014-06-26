@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"github.com/amir/raidman"
 	"github.com/supherman/riemann-docker-health/docker"
 	"github.com/supherman/riemann-docker-health/docker/cpu"
@@ -32,17 +31,24 @@ func Hostname() string {
 	return hostname
 }
 
+func ContainerMetaData(container string) map[string]string {
+  attributes := make(map[string]string)
+  attributes["container"] = container
+  return attributes
+}
+
 func Alert(event *raidman.Event) {
 	c, err := raidman.Dial("tcp", "localhost:5555")
 	if err != nil {
-		panic(err)
+		log.Println(err.Error())
 	}
 	err = c.Send(event)
 
 	if err != nil {
-		panic(err)
+		log.Println(err.Error())
+	} else {
+		c.Close()
 	}
-	c.Close()
 }
 
 func ComputeState(metric int, threshold *Threshold) string {
@@ -66,7 +72,7 @@ func AlertCPU(container string, threshold *Threshold) {
 		Service: "cpu",
 		Metric:  metric,
 		Ttl:     10,
-		Host:    fmt.Sprintf("%s %s", Hostname(), container),
+    Attributes: ContainerMetaData(container),
 	}
 	Alert(cpuEvent)
 }
@@ -78,11 +84,11 @@ func AlertMemory(container string, threshold *Threshold) {
 	state := ComputeState(metric, threshold)
 
 	var memEvent = &raidman.Event{
-		State:   state,
-		Service: "memory",
-		Metric:  metric,
-		Ttl:     10,
-		Host:    fmt.Sprintf("%s %s", Hostname(), container),
+		State:      state,
+		Service:    "memory",
+		Metric:     metric,
+		Ttl:        10,
+    Attributes: ContainerMetaData(container),
 	}
 	Alert(memEvent)
 }
