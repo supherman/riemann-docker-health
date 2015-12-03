@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"github.com/amir/raidman"
 	"github.com/supherman/riemann-docker-health/docker"
 	"github.com/supherman/riemann-docker-health/docker/cpu"
@@ -34,9 +35,9 @@ func Hostname() string {
 }
 
 func ContainerMetaData(container string) map[string]string {
-  attributes := make(map[string]string)
-  attributes["container"] = container
-  return attributes
+	attributes := make(map[string]string)
+	attributes["container"] = container
+	return attributes
 }
 
 func Alert(event *raidman.Event) {
@@ -70,11 +71,11 @@ func AlertCPU(container string, threshold *Threshold) {
 	state := ComputeState(metric, threshold)
 
 	var cpuEvent = &raidman.Event{
-		State:   state,
-		Service: "cpu",
-		Metric:  metric,
-		Ttl:     10,
-    Attributes: ContainerMetaData(container),
+		State:      state,
+		Service:    "cpu",
+		Metric:     metric,
+		Ttl:        10,
+		Attributes: ContainerMetaData(container),
 	}
 	Alert(cpuEvent)
 }
@@ -90,7 +91,7 @@ func AlertMemory(container string, threshold *Threshold) {
 		Service:    "memory",
 		Metric:     metric,
 		Ttl:        10,
-    Attributes: ContainerMetaData(container),
+		Attributes: ContainerMetaData(container),
 	}
 	Alert(memEvent)
 }
